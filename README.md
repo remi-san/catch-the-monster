@@ -1,6 +1,5 @@
-Catch the Monster! {#welcome}
+Catch the Monster!
 =============================
-----------
 
 Just launch the `index.html` in your favorite browser and play.
 
