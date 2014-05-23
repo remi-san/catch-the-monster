@@ -19,6 +19,8 @@ var UserInterface = function (div) {
 	
 	// Keyboard controls
 	this.keysDown = {};
+	this.touch = { x: null, y: null };
+	this.clicked = false;
 	
 	this.init = function() {
 		var self = this;
@@ -60,20 +62,44 @@ var UserInterface = function (div) {
 		
 		this.canvas.addEventListener("touchstart", this.tap.bind(this));
 		this.canvas.addEventListener("mousedown", this.tap.bind(this));
+		
+		this.canvas.addEventListener("touchmove", this.tap.bind(this));
+		this.canvas.addEventListener("mousemove", this.track.bind(this));
+		
+		this.canvas.addEventListener("touchend", this.release.bind(this));
+		this.canvas.addEventListener("mouseup", this.release.bind(this));
+		
+		this.canvas.addEventListener("touchleave", this.release.bind(this));
+		this.canvas.addEventListener("mouseout", this.release.bind(this));
 	};
 	
 	this.tap = function (e) {
-		var pos = this.getElementPosition(this.canvas),
-			tapX = e.targetTouches ? e.targetTouches[0].pageX : e.pageX,
-			tapY = e.targetTouches ? e.targetTouches[0].pageY : e.pageY;
+		this.clicked = true;
+		this.track(e);
+	}
+	
+	this.track = function (e) {
 		
-		var x = (tapX - pos.x);
-		var y = (tapY - pos.y);
+		if (this.clicked) {
+			var pos = this.getElementPosition(this.canvas),
+				tapX = e.targetTouches ? e.targetTouches[0].pageX : e.pageX,
+				tapY = e.targetTouches ? e.targetTouches[0].pageY : e.pageY;
+			
+			var currX = (tapX - pos.x);
+			var currY = (tapY - pos.y);
 
-		if (x>196 && x<316 && y>250 && y<300) {
-			this.start = true;
+			this.touch = { x: currX, y: currY };
+			
+			if (currX>196 && currX<316 && currY>250 && currY<300) {
+				this.start = true;
+			}
 		}
 	};
+	
+	this.release = function (e) {
+		this.clicked = false;
+		this.touch = { x: null, y: null };
+	}
 	
 	this.getElementPosition = function (element) {
 	
@@ -133,11 +159,11 @@ var UserInterface = function (div) {
 		} else {
 			
 			if (this.heroReady) {
-				this.ctx.drawImage(this.heroImage, hero.x+32, hero.y+32);
+				this.ctx.drawImage(this.heroImage, hero.x, hero.y);
 			}
 
 			if (this.monsterReady) {
-				this.ctx.drawImage(this.monsterImage, monster.x+32, monster.y+32);
+				this.ctx.drawImage(this.monsterImage, monster.x, monster.y);
 			}
 
 			// Score
@@ -150,6 +176,8 @@ var UserInterface = function (div) {
 			this.ctx.fillText("Hero :"+hero.x+"/"+hero.y, 0, this.canvas.height-20);
 			this.ctx.fillText("Robot : "+monster.x+"/"+monster.y, 0, this.canvas.height-40);
 			
+			this.ctx.textAlign = "right";
+			this.ctx.fillText("Click :"+this.touch.x+"/"+this.touch.y, this.canvas.width, this.canvas.height-20);
 		}
 	};
 	
@@ -166,11 +194,11 @@ var Game = function(ui) {
 	this.then = Date.now();
 	
 	// Characters
-	this.hero = { name: 'Hero', speed: 384, width: 32, height: 32, moving: false };
-	this.monster = { name: 'monster', speed: 384, width: 32, height: 32, moving: false };
+	this.hero = { name: 'Hero', speed: 384, width: 32, height: 32, moving: false, touch: true };
+	this.monster = { name: 'monster', speed: 384, width: 32, height: 32, moving: false, touch: false };
 	
 	// Area
-	this.gameArea = { width: 512-64, height: 480-64 };
+	this.gameArea = { width: 512, height: 480 };
 
 	// Character controls
 	this.heroControls   = { up: 38, down: 40, left: 37, right: 39 };
@@ -208,18 +236,39 @@ var Game = function(ui) {
 		var x = character.x;
 		var y = character.y;
 		
-		if (keys.up    in ui.keysDown) { y -= character.speed * modifier; moving = true; } // Player holding up
-		if (keys.down  in ui.keysDown) { y += character.speed * modifier; moving = true; } // Player holding down
-		if (keys.left  in ui.keysDown) { x -= character.speed * modifier; moving = true; } // Player holding left
-		if (keys.right in ui.keysDown) { x += character.speed * modifier; moving = true; } // Player holding right
+		var touchX = x;
+		var touchY = y;
 		
-		//prevents from quitting the game area
-		if (x < 0) { x = 0; }
-		else if (x > this.gameArea.width-character.width) { x = this.gameArea.width-character.width; }
+		var distanceMove = character.speed * modifier;
 		
-		if (y < 0) { y = 0; }
-		else if (y > this.gameArea.height-character.height) { y = this.gameArea.height-character.height; }
-
+		if (character.touch && ui.touch.x !== null) {
+			touchX = ui.touch.x-(character.width/2);
+			touchY = ui.touch.y-(character.height/2);
+		} else {
+			if (keys.up    in ui.keysDown) { touchY -= distanceMove; } // Player holding up
+			if (keys.down  in ui.keysDown) { touchY += distanceMove; } // Player holding down
+			if (keys.left  in ui.keysDown) { touchX -= distanceMove; } // Player holding left
+			if (keys.right in ui.keysDown) { touchX += distanceMove; } // Player holding right
+		}
+		
+		var distX = character.x-touchX;
+		var distY = character.y-touchY;
+		
+		var distance = Math.sqrt(distX*distX+distY*distY);
+		var ratio = distance / distanceMove;
+		
+		if(ratio <= 1) {
+			x = touchX;
+			y = touchY;
+		} else {
+			x -= distX / ratio;
+			y -= distY / ratio;
+		}
+		
+		if(Math.abs(character.x-x) !== 0 || Math.abs(character.y-y) !== 0) {
+			moving = true;
+		}
+		
 		return {x: Math.round(x), y: Math.round(y), moving: moving};
 	};
 	
@@ -236,6 +285,18 @@ var Game = function(ui) {
 		
 		this.characters.forEach(function(characterOptions) {
 			var newCharacterPosition = self.move(characterOptions.character, characterOptions.controls, modifier);
+			
+			//prevents from quitting the game area
+			if (newCharacterPosition.x < 32) { newCharacterPosition.x = 32; }
+			else if (newCharacterPosition.x > self.gameArea.width-32-characterOptions.character.width) {
+				newCharacterPosition.x = self.gameArea.width-32-characterOptions.character.width;
+			}
+			
+			if (newCharacterPosition.y < 32) { newCharacterPosition.y = 32; }
+			else if (newCharacterPosition.y > self.gameArea.height-32-characterOptions.character.height) {
+				newCharacterPosition.y = self.gameArea.height-32-characterOptions.character.height;
+			}
+			
 			characterOptions.character.x      = newCharacterPosition.x;
 			characterOptions.character.y      = newCharacterPosition.y;
 			characterOptions.character.moving = newCharacterPosition.moving;
