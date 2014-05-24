@@ -21,16 +21,6 @@ var UserInterface = function (div, width, height) {
     this.marginLeft = 0;
     this.marginTop = 0;
 	
-	// Images
-	this.bgImage = new UIImage("images/background.png");
-	this.heroImage = new UIImage("images/hero.png");
-	this.monsterImage = new UIImage("images/monster.png");
-	
-	// Loading
-	this.bgReady = false;
-	this.heroReady = false;
-	this.monsterReady = false;
-	
 	// Keyboard controls
 	this.keysDown = {};
 	this.touch = { x: null, y: null };
@@ -127,10 +117,8 @@ var UserInterface = function (div, width, height) {
 			
 			var currX = (tapX - pos.x);
 			var currY = (tapY - pos.y);
-            
-            var realPos = this.getRealXY(currX, currY);
 
-			this.touch = { x: realPos.x, y: realPos.y };
+			this.touch = this.getRealXY(currX, currY);
 		}
 	};
 	
@@ -210,44 +198,22 @@ var UserInterface = function (div, width, height) {
     };
     
 	// Draw everything
-	this.render = function (displayMenu, hero, monster, monstersCaught, delta) {
+	this.render = function (graphics, delta) {
 		
-		this.bgImage.render(this, 0, 0);
+		var self = this;
 		
-		if (displayMenu) {
-			
-            // Menu
-            this.drawRectangle(56, 140, 400, 200, "lightgrey", "black", "6");
-			
-			// Menu Title
-			this.drawText("Catch the Robot", 256, 180, "black", "center", "top", 32);
-			
-			// Start button
-			this.drawRectangle(196, 250, 120, 50, "black"); 
-			
-			// Start button text
-			this.drawText("Start", 256, 256, "white", "center", "top", 32);
-			
-		} else {
-			
-			this.heroImage.render(this, hero.x, hero.y);
-            this.monsterImage.render(this, monster.x, monster.y);
-
-			// Score
-			this.ctx.font = "18px Helvetica";
-			this.ctx.fillStyle = "rgb(250, 250, 250)";
-			this.ctx.textAlign = "left";
-			this.ctx.textBaseline = "top";
-			
-			this.drawText("Catches : " + monstersCaught, 0, 0, "white");
-		}
-        
-        this.delta += delta;
+		this.delta += delta;
         if(this.delta >= 0.2) {
             this.delta = 0.001;
             this.fps = Math.round(1/delta);
         }
-        
+		
+		// Draw graphics
+		graphics.forEach( function(element) {
+			element.gr.render(self, element.x, element.y);
+		});
+		
+		// Display debug info
         if (this.debug === true) {
             this.drawText(this.fps+" FPS", this.width, 0, "white", "right");
 
@@ -290,6 +256,21 @@ var UIImage = function (src) {
     };
     
     this.init(src);
+};
+
+var UIResource = function(render) {
+	this.render = render;
+};
+
+var UIText = function(text, color, size, font) {
+	this.text = text;
+	this.color = color;
+	this.size = size;
+	this.font = font;
+	
+	this.render = function(ui, x, y) {
+		ui.drawText(this.text, x, y, this.color, undefined, undefined, this.size, this.font);
+	};
 };
 
 var Game = function() {
@@ -402,6 +383,18 @@ var MiddleWare = function(ui, game) {
 	// Date init
 	this.then = Date.now();
 
+	// Graphics
+	this.bgImage = new UIImage("images/background.png");
+	this.heroImage = new UIImage("images/hero.png");
+	this.monsterImage = new UIImage("images/monster.png");
+	this.score = new UIText("", "white");
+	this.menu = new UIResource(function (ui, x, y) {
+		ui.drawRectangle(x, y, 400, 200, "lightgrey", "black", "6"); // Menu
+		ui.drawText("Catch the Robot", 200+x, 40+y, "black", "center", "top", 32); // Menu Title
+		ui.drawRectangle(140+x, 110+y, 120, 50, "black"); // Start button
+		ui.drawText("Start", 200+x, 116+y, "white", "center", "top", 32); // Start button text
+	});
+	
 	// Character controls
 	this.playerOneControls   = { up: 38, down: 40, left: 37, right: 39, touch: false };
 	this.playerTwoControls = { up: 90, down: 83, left: 81, right: 68, touch: true };
@@ -440,6 +433,7 @@ var MiddleWare = function(ui, game) {
             this.game.started = true;
         }
         
+		// Update characters positions
         this.characters.forEach(function(characterOptions) {
             
             var char = characterOptions.character;
@@ -450,7 +444,20 @@ var MiddleWare = function(ui, game) {
         });
         
 		this.game.update();
-		this.ui.render(!this.game.started, this.game.hero, this.game.monster, this.game.monstersCaught, delta);
+		
+		// TODO build graphics array
+		var graphics = [ { gr: this.bgImage, x: 0, y: 0 } ];
+		if (!this.game.started) {
+			graphics.push({ gr: this.menu, x: 56, y: 140 });
+		} else {
+			graphics.push({ gr: this.heroImage, x: this.game.hero.x, y: this.game.hero.y });
+			graphics.push({ gr: this.monsterImage, x: this.game.monster.x, y: this.game.monster.y });
+			
+			this.score.text = "Score : "+this.game.monstersCaught;
+			graphics.push({ gr: this.score, x: 5, y: 5 });
+		}
+		
+		this.ui.render(graphics, delta);
 
 		this.then = now;
 
@@ -466,11 +473,6 @@ var MiddleWare = function(ui, game) {
 var w = window;
 var requestAnimationFrame = w.requestAnimationFrame || w.webkitRequestAnimationFrame || w.msRequestAnimationFrame || w.mozRequestAnimationFrame;
 
-// Create the Game
-var ui = new UserInterface(document.getElementById("game"), 512, 480);
-ui.debug = true;
-var game = new Game();
-
 // Run the game
-var mw = new MiddleWare(ui, game);
+var mw = new MiddleWare(new UserInterface(document.getElementById("game"), 512, 480), new Game());
 mw.run();
