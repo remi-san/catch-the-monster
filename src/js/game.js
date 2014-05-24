@@ -1,5 +1,8 @@
 var UserInterface = function (div, width, height) {
 	
+    // Debug
+    this.debug = false;
+    
 	// Canvas
 	this.div = div;
     this.width = width;
@@ -19,9 +22,9 @@ var UserInterface = function (div, width, height) {
     this.marginTop = 0;
 	
 	// Images
-	this.bgImage = new Image();
-	this.heroImage = new Image();
-	this.monsterImage = new Image();
+	this.bgImage = new UIImage("images/background.png");
+	this.heroImage = new UIImage("images/hero.png");
+	this.monsterImage = new UIImage("images/monster.png");
 	
 	// Loading
 	this.bgReady = false;
@@ -44,33 +47,12 @@ var UserInterface = function (div, width, height) {
 		this.ctx = this.canvas.getContext("2d");
 		this.div.appendChild(this.canvas);
         
-        this.updateUI();
-		
-		// Background image
-		this.bgImage.onload = function () {
-			self.bgReady = true;
-		};
-		this.bgImage.src = "images/background.png";
-
-		// Hero image
-		this.heroImage.onload = function () {
-			self.heroReady = true;
-		};
-		this.heroImage.src = "images/hero.png";
-
-		// monster image
-		this.monsterImage.onload = function () {
-			self.monsterReady = true;
-		};
-		this.monsterImage.src = "images/monster.png";
-		
-		
 		//Keys listeners
-		addEventListener("keydown", function (e) {
+		window.addEventListener("keydown", function (e) {
 			self.keysDown[e.keyCode] = true;
 		}, false);
 
-		addEventListener("keyup", function (e) {
+		window.addEventListener("keyup", function (e) {
 			delete self.keysDown[e.keyCode];
 		}, false);
 		
@@ -97,10 +79,12 @@ var UserInterface = function (div, width, height) {
         
         window.addEventListener("orientationchange", this.updateUI.bind(this));
         window.addEventListener("resize", this.updateUI.bind(this));
+        
+        this.updateUI();
 	};
 	
     this.updateUI = function () {
-        this.screenWidth = window.innerWidth;;
+        this.screenWidth = window.innerWidth;
         this.screenHeight = window.innerHeight;
         this.screenRatio = this.screenWidth/this.screenHeight;
         
@@ -124,13 +108,13 @@ var UserInterface = function (div, width, height) {
 		if(button === 1) {
 			this.tap(e);
 		}
-	}
+	};
 	
 	this.tap = function (e) {
 		this.clicked = true;
 		this.track(e);
 		e.preventDefault();
-	}
+	};
 	
 	this.track = function (e) {
 		
@@ -144,9 +128,9 @@ var UserInterface = function (div, width, height) {
 			var currX = (tapX - pos.x);
 			var currY = (tapY - pos.y);
             
-            var pos = this.getRealXY(currX, currY);
+            var realPos = this.getRealXY(currX, currY);
 
-			this.touch = { x: pos.x, y: pos.y };
+			this.touch = { x: realPos.x, y: realPos.y };
 		}
 	};
 	
@@ -154,12 +138,12 @@ var UserInterface = function (div, width, height) {
 		e = e || window.event;
 		this.clicked = false;
 		this.touch = { x: null, y: null };
-	}
+	};
 	
 	this.getElementPosition = function (element) {
 	
        var parentOffset,
-       	   pos = {
+           pos = {
                x: element.offsetLeft,
                y: element.offsetTop 
            };
@@ -225,19 +209,10 @@ var UserInterface = function (div, width, height) {
         this.ctx.fillText(text, pos.x, pos.y);
     };
     
-	
 	// Draw everything
 	this.render = function (displayMenu, hero, monster, monstersCaught, delta) {
 		
-        this.delta += delta;
-            if(this.delta >= 0.2) {
-                this.delta = 0.001;
-                this.fps = Math.round(1/delta);
-            }
-        
-		if (this.bgReady) {
-            this.drawImage(this.bgImage, 0, 0);
-		}
+		this.bgImage.render(this, 0, 0);
 		
 		if (displayMenu) {
 			
@@ -255,13 +230,8 @@ var UserInterface = function (div, width, height) {
 			
 		} else {
 			
-			if (this.heroReady) {
-				this.drawImage(this.heroImage, hero.x, hero.y);
-			}
-
-			if (this.monsterReady) {
-				this.drawImage(this.monsterImage, monster.x, monster.y);
-			}
+			this.heroImage.render(this, hero.x, hero.y);
+            this.monsterImage.render(this, monster.x, monster.y);
 
 			// Score
 			this.ctx.font = "18px Helvetica";
@@ -270,49 +240,73 @@ var UserInterface = function (div, width, height) {
 			this.ctx.textBaseline = "top";
 			
 			this.drawText("Catches : " + monstersCaught, 0, 0, "white");
-            
-			this.drawText(this.fps+" FPS", this.width, 0, "white", "right");
-			
-			if (this.touch.x !== null) {
+		}
+        
+        this.delta += delta;
+        if(this.delta >= 0.2) {
+            this.delta = 0.001;
+            this.fps = Math.round(1/delta);
+        }
+        
+        if (this.debug === true) {
+            this.drawText(this.fps+" FPS", this.width, 0, "white", "right");
+
+            if (this.touch.x !== null) {
                 this.drawText("Click :"+Math.round(this.touch.x)+"/"+Math.round(this.touch.y), this.width, this.height-20, "white", "right");
             }
-		}
+        }
 	};
 	
 	// Init the UI
 	this.init();
 };
 
-var UIElement = function (render) {
-    this.render = render;
-}
+var UIImage = function (src) {
+    this.image = new Image();
+    this.ready = false;
+    this.src = src;
+    
+    this.init = function (src) {
+        var self = this;
+        
+        this.image.onload = function () {
+            self.ready = true;
+        };
+        this.image.src = this.src;
+    };
+    
+    this.width = function() {
+        return this.image.width;
+    };
+    
+    this.height = function() {
+        return this.image.height;
+    };
+    
+    this.render = function(ui, x, y) {
+        if (this.ready === true) {
+            ui.drawImage(this.image, x, y);
+        }
+    };
+    
+    this.init(src);
+};
 
-var Game = function(ui) {
-	
-	// UI
-	this.ui = ui;
+var Game = function() {
 	
 	// Date init
 	this.then = Date.now();
 	
 	// Characters
-	this.hero = { name: 'Hero', speed: 384, width: 32, height: 32, moving: false, touch: true };
-	this.monster = { name: 'monster', speed: 384, width: 32, height: 32, moving: false, touch: false };
+	this.hero = { name: 'Hero', speed: 384, width: 32, height: 32, moving: false };
+	this.monster = { name: 'monster', speed: 384, width: 32, height: 32, moving: false };
 	
 	// Area
 	this.gameArea = { width: 512, height: 480 };
-
-	// Character controls
-	this.heroControls   = { up: 38, down: 40, left: 37, right: 39 };
-	this.monsterControls = { up: 90, down: 83, left: 81, right: 68 };
 	
 	// Game vars
 	this.started = false;
 	this.monstersCaught = 0;
-	this.characters = [
-       {character : this.hero, controls : this.heroControls}, 
-       {character : this.monster, controls : this.monsterControls}
-    ];
 
 	this.init = function () {
 		this.reset();
@@ -331,79 +325,54 @@ var Game = function(ui) {
 		this.started = false;
 	};
 	
-	this.move = function(character, keys, modifier) {
+	this.move = function(character, target, distanceMove) {
 		
 		var moving = false;
-		
-		var x = character.x;
-		var y = character.y;
-		
-		var touchX = x;
-		var touchY = y;
-		
-		var distanceMove = character.speed * modifier;
-		
-		if (character.touch && ui.touch.x !== null) {
-			touchX = ui.touch.x-(character.width/2);
-			touchY = ui.touch.y-(character.height/2);
-		} else {
-			if (keys.up    in ui.keysDown) { touchY -= distanceMove; } // Player holding up
-			if (keys.down  in ui.keysDown) { touchY += distanceMove; } // Player holding down
-			if (keys.left  in ui.keysDown) { touchX -= distanceMove; } // Player holding left
-			if (keys.right in ui.keysDown) { touchX += distanceMove; } // Player holding right
-		}
-		
-		var distX = character.x-touchX;
-		var distY = character.y-touchY;
+        
+		var distX = character.x-target.x;
+		var distY = character.y-target.y;
 		
 		var distance = Math.sqrt(distX*distX+distY*distY);
 		var ratio = distance / distanceMove;
+        
+        var newX = character.x;
+        var newY = character.y;
 		
-		if(ratio <= 1) {
-			x = touchX;
-			y = touchY;
+		if(ratio > 1) {
+			newX -= distX / ratio;
+			newY -= distY / ratio;
 		} else {
-			x -= distX / ratio;
-			y -= distY / ratio;
-		}
-		
-		if(Math.abs(character.x-x) !== 0 || Math.abs(character.y-y) !== 0) {
-			moving = true;
-		}
-		
-		return {x: x, y: y, moving: moving};
-	};
-	
-	// Update game objects
-	this.update = function (modifier) {
-		
-		if (this.ui.touch.x>196 && this.ui.touch.x<316 && this.ui.touch.y>250 && this.ui.touch.y<300) {
-            this.started = true;
-            return;
+            newX = target.x;
+			newY = target.y;
         }
 		
+		if(Math.abs(character.x-newX) !== 0 || Math.abs(character.y-newY) !== 0) {
+			moving = true;
+		}
+			
+        //prevents from quitting the game area
+        if (newX < 32) { newX = 32; }
+        else if (newX > this.gameArea.width-32-character.width) {
+            newX = this.gameArea.width-32-character.width;
+        }
+
+        if (newY < 32) { newY = 32; }
+        else if (newY > this.gameArea.height-32-character.height) {
+            newY = this.gameArea.height-32-character.height;
+        }
+
+        // Update the character position
+        character.x      = newX;
+        character.y      = newY;
+        character.moving = moving;
+	};
+    
+    
+	
+	// Update game objects
+	this.update = function () {
+		
 		if (!this.started) { return; }
-		
-		var self = this;
-		
-		this.characters.forEach(function(characterOptions) {
-			var newCharacterPosition = self.move(characterOptions.character, characterOptions.controls, modifier);
-			
-			//prevents from quitting the game area
-			if (newCharacterPosition.x < 32) { newCharacterPosition.x = 32; }
-			else if (newCharacterPosition.x > self.gameArea.width-32-characterOptions.character.width) {
-				newCharacterPosition.x = self.gameArea.width-32-characterOptions.character.width;
-			}
-			
-			if (newCharacterPosition.y < 32) { newCharacterPosition.y = 32; }
-			else if (newCharacterPosition.y > self.gameArea.height-32-characterOptions.character.height) {
-				newCharacterPosition.y = self.gameArea.height-32-characterOptions.character.height;
-			}
-			
-			characterOptions.character.x      = newCharacterPosition.x;
-			characterOptions.character.y      = newCharacterPosition.y;
-			characterOptions.character.moving = newCharacterPosition.moving;
-		});
 		
 		// Are they touching?
 		if (this.detectCollision(this.hero, this.monster)) {
@@ -414,40 +383,94 @@ var Game = function(ui) {
 	
 	this.detectCollision = function (char1, char2) {
 		return (
-			char1.x <= (char2.x + char2.width)
-			&& char2.x <= (char1.x + char1.width)
-			&& char1.y <= (char2.y + char2.height)
-			&& char2.y <= (char1.y + char1.height)
+			char1.x <= (char2.x + char2.width) &&
+			char2.x <= (char1.x + char1.width) &&
+			char1.y <= (char2.y + char2.height) &&
+			char2.y <= (char1.y + char1.height)
 		);
-	};
-	
-	// The main game loop
-	this.run = function () {
-		var now = Date.now();
-		var deltaMs = now - this.then;
-		var delta = deltaMs / 1000;
-
-		this.update(delta);
-		ui.render(!this.started, this.hero, this.monster, this.monstersCaught, delta);
-
-		this.then = now;
-
-		// Request to do this again ASAP
-		requestAnimationFrame(this.run.bind(this)); //TODO Find how to retrieve game scope
-		
-		return delta;
 	};
 	
 	// Init the game
 	this.init();
 };
 
-//TODO change that
-//Cross-browser support for requestAnimationFrame
+var MiddleWare = function(ui, game) {
+    // 
+	this.ui = ui;
+    this.game = game;
+	
+	// Date init
+	this.then = Date.now();
+
+	// Character controls
+	this.playerOneControls   = { up: 38, down: 40, left: 37, right: 39, touch: false };
+	this.playerTwoControls = { up: 90, down: 83, left: 81, right: 68, touch: true };
+    
+    // Characters config
+    this.characters = [
+       {character : this.game.hero, controls : this.playerOneControls}, 
+       {character : this.game.monster, controls : this.playerTwoControls}
+    ];
+    
+    this.getCharacterTarget = function (char, controls, distanceMove) {
+        var target = { x: char.x, y: char.y};
+
+        if (controls.touch && this.ui.touch.x !== null) {
+            target.x = this.ui.touch.x-(char.width/2);
+            target.y = this.ui.touch.y-(char.height/2);
+        } else {
+            if (controls.up    in this.ui.keysDown) { target.y -= distanceMove; } // Player holding up
+            if (controls.down  in this.ui.keysDown) { target.y += distanceMove; } // Player holding down
+            if (controls.left  in this.ui.keysDown) { target.x -= distanceMove; } // Player holding left
+            if (controls.right in this.ui.keysDown) { target.x += distanceMove; } // Player holding right
+        }
+        
+        return target;
+    };
+    
+    // The main game loop
+	this.run = function () {
+		var now = Date.now();
+		var deltaMs = now - this.then;
+		var delta = deltaMs / 1000;
+        
+        var self = this;
+
+        if (!this.game.started && this.ui.touch.x>196 && this.ui.touch.x<316 && this.ui.touch.y>250 && this.ui.touch.y<300) {
+            this.game.started = true;
+        }
+        
+        this.characters.forEach(function(characterOptions) {
+            
+            var char = characterOptions.character;
+            var controls = characterOptions.controls;
+            var distanceMove = char.speed * delta;
+            
+            game.move(char, self.getCharacterTarget(char, controls, distanceMove), distanceMove);
+        });
+        
+		this.game.update();
+		this.ui.render(!this.game.started, this.game.hero, this.game.monster, this.game.monstersCaught, delta);
+
+		this.then = now;
+
+		// Request to do this again ASAP
+		requestAnimationFrame(this.run.bind(this));
+		
+		return delta;
+	};
+};
+
+// TODO change that
+// Cross-browser support for requestAnimationFrame
 var w = window;
-requestAnimationFrame = w.requestAnimationFrame || w.webkitRequestAnimationFrame || w.msRequestAnimationFrame || w.mozRequestAnimationFrame;
+var requestAnimationFrame = w.requestAnimationFrame || w.webkitRequestAnimationFrame || w.msRequestAnimationFrame || w.mozRequestAnimationFrame;
 
 // Create the Game
 var ui = new UserInterface(document.getElementById("game"), 512, 480);
-var game = new Game(ui);
-game.run();
+ui.debug = true;
+var game = new Game();
+
+// Run the game
+var mw = new MiddleWare(ui, game);
+mw.run();
