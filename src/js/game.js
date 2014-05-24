@@ -1,11 +1,22 @@
-var UserInterface = function (div) {
-	
-	this.start = false;
+var UserInterface = function (div, width, height) {
 	
 	// Canvas
 	this.div = div;
+    this.width = width;
+    this.height = height;
+    this.canvasRatio = width/height;
 	this.canvas = null;
 	this.ctx = null;
+    
+    // Screen
+    this.screenWidth = 512;
+    this.screenHeight = 512;
+    this.screenRatio = 1;
+    
+    // Adaptation
+    this.ratio = 1;
+    this.marginLeft = 0;
+    this.marginTop = 0;
 	
 	// Images
 	this.bgImage = new Image();
@@ -22,15 +33,18 @@ var UserInterface = function (div) {
 	this.touch = { x: null, y: null };
 	this.clicked = false;
 	
+    // FPS
+	this.delta = 0.2;
+	this.fps = 0;
+	
 	this.init = function() {
 		var self = this;
 		
 		this.canvas = document.createElement("canvas");
 		this.ctx = this.canvas.getContext("2d");
-		
-		this.canvas.width = 512;
-		this.canvas.height = 480;
 		this.div.appendChild(this.canvas);
+        
+        this.updateUI();
 		
 		// Background image
 		this.bgImage.onload = function () {
@@ -60,8 +74,17 @@ var UserInterface = function (div) {
 			delete self.keysDown[e.keyCode];
 		}, false);
 		
+		this.canvas.addEventListener("contextmenu", function (e) {
+			e = e || window.event;
+			if (e.stopPropagation) { e.stopPropagation(); }
+			e.cancelBubble = true;
+			e.preventDefault();
+		});
+		
+        window.addEventListener("load", function() { setTimeout(function(){ window.scrollTo(0, 1);}, 0); });
+        
 		this.canvas.addEventListener("touchstart", this.tap.bind(this));
-		this.canvas.addEventListener("mousedown", this.tap.bind(this));
+		this.canvas.addEventListener("mousedown", this.click.bind(this));
 		
 		this.canvas.addEventListener("touchmove", this.tap.bind(this));
 		this.canvas.addEventListener("mousemove", this.track.bind(this));
@@ -71,14 +94,47 @@ var UserInterface = function (div) {
 		
 		this.canvas.addEventListener("touchleave", this.release.bind(this));
 		this.canvas.addEventListener("mouseout", this.release.bind(this));
+        
+        window.addEventListener("orientationchange", this.updateUI.bind(this));
+        window.addEventListener("resize", this.updateUI.bind(this));
 	};
+	
+    this.updateUI = function () {
+        this.screenWidth = window.innerWidth;;
+        this.screenHeight = window.innerHeight;
+        this.screenRatio = this.screenWidth/this.screenHeight;
+        
+        if (this.canvasRatio>this.screenRatio) {
+            this.ratio = this.screenWidth / this.width;
+            this.marginTop = (this.screenHeight-(this.height*this.ratio))/2;
+            this.marginLeft = 0;
+        } else {
+            this.ratio =  this.screenHeight / this.height;
+            this.marginTop = 0;
+            this.marginLeft = (this.screenWidth-(this.width*this.ratio))/2;
+        }
+        this.canvas.width = this.screenWidth;
+        this.canvas.height = this.screenHeight;
+    };
+    
+	this.click = function (e) {
+		e = e || window.event;
+		var button = e.which || e.button;
+		
+		if(button === 1) {
+			this.tap(e);
+		}
+	}
 	
 	this.tap = function (e) {
 		this.clicked = true;
 		this.track(e);
+		e.preventDefault();
 	}
 	
 	this.track = function (e) {
+		
+		e = e || window.event;
 		
 		if (this.clicked) {
 			var pos = this.getElementPosition(this.canvas),
@@ -87,16 +143,15 @@ var UserInterface = function (div) {
 			
 			var currX = (tapX - pos.x);
 			var currY = (tapY - pos.y);
+            
+            var pos = this.getRealXY(currX, currY);
 
-			this.touch = { x: currX, y: currY };
-			
-			if (currX>196 && currX<316 && currY>250 && currY<300) {
-				this.start = true;
-			}
+			this.touch = { x: pos.x, y: pos.y };
 		}
 	};
 	
 	this.release = function (e) {
+		e = e || window.event;
 		this.clicked = false;
 		this.touch = { x: null, y: null };
 	}
@@ -116,54 +171,96 @@ var UserInterface = function (div) {
        }
        return pos;
     };
+    
+    this.getRealValue = function (value) {
+        return value / this.ratio;
+    };
+    
+    this.getRealXY = function (x, y) {
+        return { x: this.getRealValue(x-this.marginLeft), y: this.getRealValue(y-this.marginTop) };
+    };
+    
+    this.getScreenValue = function (value) {
+        return value * this.ratio;
+    };
+    
+    this.getScreenXY = function (x, y) {
+        return { x: this.getScreenValue(x)+this.marginLeft, y: this.getScreenValue(y)+this.marginTop };
+    };
+    
+    this.drawImage = function (image, x, y, width, height) {
+        width = width || image.width;
+        height = height || image.height;
+        var pos = this.getScreenXY(x, y);
+        this.ctx.drawImage(image, 0, 0, width, height, pos.x, pos.y, this.getScreenValue(width), this.getScreenValue(height));
+    };
+    
+    this.drawRectangle = function (x, y, width, height, fillStyle, strokeStyle, lineWidth) {
+        // Colors
+        this.ctx.fillStyle = fillStyle || "rgb(255, 255, 255)";
+        this.ctx.strokeStyle = strokeStyle || "rgb(0, 0,0)";
+        this.ctx.lineWidth = lineWidth || 0;
+        
+        var pos = this.getScreenXY(x, y);
+
+        // Rectangle
+        this.ctx.beginPath();
+        this.ctx.rect(pos.x, pos.y, this.getScreenValue(width), this.getScreenValue(height)); 
+        this.ctx.fill();
+        this.ctx.stroke();
+    };
+    
+    this.drawText = function (text, x, y, color, align, vAlign, size, font) {
+        
+        size = size || 16;
+        font = font || "Helvetica";
+        
+        this.ctx.fillStyle = color || "rgb(0, 0,0)";
+        this.ctx.textAlign = align || "left";
+        this.ctx.textBaseline = vAlign || "top";
+        this.ctx.font = Math.round(size*this.ratio)+"px "+font;
+        
+        var pos = this.getScreenXY(x, y);
+        
+        this.ctx.fillText(text, pos.x, pos.y);
+    };
+    
 	
 	// Draw everything
-	this.render = function (displayMenu, hero, monster, monstersCaught) {
+	this.render = function (displayMenu, hero, monster, monstersCaught, delta) {
 		
+        this.delta += delta;
+            if(this.delta >= 0.2) {
+                this.delta = 0.001;
+                this.fps = Math.round(1/delta);
+            }
+        
 		if (this.bgReady) {
-			this.ctx.drawImage(this.bgImage, 0, 0);
+            this.drawImage(this.bgImage, 0, 0);
 		}
 		
 		if (displayMenu) {
 			
-			// Menu Colors
-			this.ctx.fillStyle = "lightgrey";
-			this.ctx.lineWidth="6";
-			this.ctx.strokeStyle="black";
-			
-			// Menu
-			this.ctx.beginPath();
-			this.ctx.rect(56,140,400,200); 
-			this.ctx.fill();
-			this.ctx.stroke();
-			
-			// Menu Title colors
-			this.ctx.textAlign = "center";
-			this.ctx.font = "32px Helvetica";
-			this.ctx.textBaseline = "top";
-			this.ctx.fillStyle = "black";
+            // Menu
+            this.drawRectangle(56, 140, 400, 200, "lightgrey", "black", "6");
 			
 			// Menu Title
-			this.ctx.fillText("Catch the Robot", 256, 180);
+			this.drawText("Catch the Robot", 256, 180, "black", "center", "top", 32);
 			
 			// Start button
-			this.ctx.beginPath();
-			this.ctx.rect(196,250,120,50); 
-			this.ctx.fill();
-			this.ctx.stroke();
+			this.drawRectangle(196, 250, 120, 50, "black"); 
 			
 			// Start button text
-			this.ctx.fillStyle = "white";
-			this.ctx.fillText("Start", 256, 256);
+			this.drawText("Start", 256, 256, "white", "center", "top", 32);
 			
 		} else {
 			
 			if (this.heroReady) {
-				this.ctx.drawImage(this.heroImage, hero.x, hero.y);
+				this.drawImage(this.heroImage, hero.x, hero.y);
 			}
 
 			if (this.monsterReady) {
-				this.ctx.drawImage(this.monsterImage, monster.x, monster.y);
+				this.drawImage(this.monsterImage, monster.x, monster.y);
 			}
 
 			// Score
@@ -172,18 +269,23 @@ var UserInterface = function (div) {
 			this.ctx.textAlign = "left";
 			this.ctx.textBaseline = "top";
 			
-			this.ctx.fillText("Catches : " + monstersCaught, 0, 0);
-			this.ctx.fillText("Hero :"+hero.x+"/"+hero.y, 0, this.canvas.height-20);
-			this.ctx.fillText("Robot : "+monster.x+"/"+monster.y, 0, this.canvas.height-40);
+			this.drawText("Catches : " + monstersCaught, 0, 0, "white");
+            
+			this.drawText(this.fps+" FPS", this.width, 0, "white", "right");
 			
-			this.ctx.textAlign = "right";
-			this.ctx.fillText("Click :"+this.touch.x+"/"+this.touch.y, this.canvas.width, this.canvas.height-20);
+			if (this.touch.x !== null) {
+                this.drawText("Click :"+Math.round(this.touch.x)+"/"+Math.round(this.touch.y), this.width, this.height-20, "white", "right");
+            }
 		}
 	};
 	
 	// Init the UI
 	this.init();
 };
+
+var UIElement = function (render) {
+    this.render = render;
+}
 
 var Game = function(ui) {
 	
@@ -269,15 +371,16 @@ var Game = function(ui) {
 			moving = true;
 		}
 		
-		return {x: Math.round(x), y: Math.round(y), moving: moving};
+		return {x: x, y: y, moving: moving};
 	};
 	
 	// Update game objects
 	this.update = function (modifier) {
 		
-		if(this.ui.start) {
-			this.start();
-		}
+		if (this.ui.touch.x>196 && this.ui.touch.x<316 && this.ui.touch.y>250 && this.ui.touch.y<300) {
+            this.started = true;
+            return;
+        }
 		
 		if (!this.started) { return; }
 		
@@ -318,23 +421,21 @@ var Game = function(ui) {
 		);
 	};
 	
-	this.start = function () {
-		this.started = true;
-		this.ui.start = false;
-	};
-	
 	// The main game loop
 	this.run = function () {
 		var now = Date.now();
-		var delta = now - this.then;
+		var deltaMs = now - this.then;
+		var delta = deltaMs / 1000;
 
-		this.update(delta / 1000);
-		ui.render(!this.started, this.hero, this.monster, this.monstersCaught);
+		this.update(delta);
+		ui.render(!this.started, this.hero, this.monster, this.monstersCaught, delta);
 
 		this.then = now;
 
 		// Request to do this again ASAP
 		requestAnimationFrame(this.run.bind(this)); //TODO Find how to retrieve game scope
+		
+		return delta;
 	};
 	
 	// Init the game
@@ -347,6 +448,6 @@ var w = window;
 requestAnimationFrame = w.requestAnimationFrame || w.webkitRequestAnimationFrame || w.msRequestAnimationFrame || w.mozRequestAnimationFrame;
 
 // Create the Game
-var ui = new UserInterface(document.getElementById("game"));
+var ui = new UserInterface(document.getElementById("game"), 512, 480);
 var game = new Game(ui);
 game.run();
