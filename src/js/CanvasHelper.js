@@ -8,7 +8,10 @@ var CanvasHelper = function (ctx, ratio, marginLeft, marginTop) {
     this.marginTop = marginTop || 0;
 	
 	this.getRealValue = function (value) {
-        return value / this.ratio;
+        if (value === undefined) {
+            return undefined;
+        }
+        return Math.round(value / this.ratio);
     };
     
     this.getRealXY = function (x, y) {
@@ -16,7 +19,10 @@ var CanvasHelper = function (ctx, ratio, marginLeft, marginTop) {
     };
     
     this.getScreenValue = function (value) {
-        return value * this.ratio;
+        if (value === undefined) {
+            return undefined;
+        }
+        return Math.round(value * this.ratio);
     };
     
     this.getScreenXY = function (x, y) {
@@ -27,7 +33,7 @@ var CanvasHelper = function (ctx, ratio, marginLeft, marginTop) {
         width = width || image.width;
         height = height || image.height;
         var pos = this.getScreenXY(x, y);
-        this.ctx.drawImage(image, 0, 0, width, height, pos.x, pos.y, this.getScreenValue(width), this.getScreenValue(height));
+        this.ctx.drawImage(image, 0, 0, image.width, image.height, pos.x, pos.y, this.getScreenValue(width), this.getScreenValue(height));
     };
     
     this.drawRectangle = function (x, y, width, height, fillStyle, strokeStyle, lineWidth) {
@@ -58,5 +64,12 @@ var CanvasHelper = function (ctx, ratio, marginLeft, marginTop) {
         var pos = this.getScreenXY(x, y);
         
         this.ctx.fillText(text, pos.x, pos.y);
+    };
+    
+    this.clear = function (x, y, width, height) {
+        var pos = this.getScreenXY((x || 0), (y || 0));
+        var realWidth = this.getScreenValue(width) || this.ctx.canvas.width;
+        var realHeight = this.getScreenValue(height) || this.ctx.canvas.height;
+        this.ctx.clearRect(pos.x, pos.y, realWidth, realHeight);
     };
 };

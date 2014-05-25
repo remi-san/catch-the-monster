@@ -61,6 +61,9 @@ var UserInterface = function (div, width, height) {
 	this.render = function (graphics) {
 		
 		var self = this;
+        
+        // Clear canvas
+        self.ch.clear(0, 0, this.width, this.height);
 		
 		// Draw graphics
 		graphics.forEach( function(element) {
@@ -72,10 +75,14 @@ var UserInterface = function (div, width, height) {
 	this.init();
 };
 
-var UIImage = function (src) {
+var UIImage = function (src, width, height) {
+    
     this.image = new Image();
     this.ready = false;
+    
     this.src = src;
+    this.width = width;
+    this.height = height;
     
     this.init = function (src) {
         var self = this;
@@ -86,17 +93,17 @@ var UIImage = function (src) {
         this.image.src = this.src;
     };
     
-    this.width = function() {
-        return this.image.width;
+    this.getWidth = function() {
+        return this.width || this.image.width;
     };
     
-    this.height = function() {
-        return this.image.height;
+    this.getHeight = function() {
+        return this.height || this.image.height;
     };
     
     this.render = function(ch, x, y) {
         if (this.ready === true) {
-            ch.drawImage(this.image, x, y);
+            ch.drawImage(this.image, x, y, this.getWidth(), this.getHeight());
         }
     };
     

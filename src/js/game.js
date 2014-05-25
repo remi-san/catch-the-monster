@@ -122,10 +122,10 @@ var GameRunner = function(ui, game, debug) {
 	this.then = Date.now();
 
 	// Graphics
-	this.bgImage = new UIImage("images/background.png");
-	this.heroImage = new UIImage("images/hero.png");
-	this.monsterImage = new UIImage("images/monster.png");
-	this.score = new UIText("", "white");
+	this.bgImage = new UIImage("images/background.png", this.ui.width, this.ui.height);
+	this.heroImage = new UIImage("images/hero.png", this.game.hero.width, this.game.hero.height);
+	this.monsterImage = new UIImage("images/monster.png", this.game.monster.width, this.game.monster.height);
+    
 	this.menu = new UIResource(function (ui, x, y) {
 		ui.drawRectangle(x, y, 400, 200, "lightgrey", "black", "6"); // Menu
 		ui.drawText("Catch the Robot", 200+x, 40+y, "black", "center", "top", 32); // Menu Title
@@ -191,11 +191,9 @@ var GameRunner = function(ui, game, debug) {
         
 		// Update characters positions
         this.characters.forEach(function(characterOptions) {
-            
             var char = characterOptions.character;
             var controls = characterOptions.controls;
             var distanceMove = char.speed * delta;
-            
             game.move(char, self.getCharacterTarget(char, controls, distanceMove), distanceMove);
         });
         
@@ -208,9 +206,7 @@ var GameRunner = function(ui, game, debug) {
 		} else {
 			graphics.push({ gr: this.heroImage, x: this.game.hero.x, y: this.game.hero.y });
 			graphics.push({ gr: this.monsterImage, x: this.game.monster.x, y: this.game.monster.y });
-			
-			this.score.text = "Score : "+this.game.monstersCaught;
-			graphics.push({ gr: this.score, x: 5, y: 5 });
+			graphics.push({ gr: new UIText("Score : "+this.game.monstersCaught, "white"), x: 5, y: 5 });
 		}
 		
 		// Display debug info
