@@ -33,9 +33,34 @@ var CatchGame = function() {
 		this.started = false;
 	};
 	
-	// Character movement management
+	// Prevents from quitting the game area
+	this.keepInBoundaries = function (character) {
+		if (character.x < this.borders.left) { character.x = this.borders.left; }
+        else if (character.x > this.borders.right-character.width) {
+            character.x = this.borders.right-character.width;
+        }
+
+        if (character.y < this.borders.top) { character.y = this.borders.top; }
+        else if (character.y > this.borders.bottom-character.height) {
+            character.y = this.borders.bottom-character.height;
+        }
+	};
+	
+	// Detect characters collisions
+	this.detectCollision = function (char1, char2) {
+		return (
+			char1.x <= (char2.x + char2.width) &&
+			char2.x <= (char1.x + char1.width) &&
+			char1.y <= (char2.y + char2.height) &&
+			char2.y <= (char1.y + char1.height)
+		);
+	};
+    
+    // Character movement management
 	this.move = function(character, target, distanceMove) {
 		
+        if (!this.started) { return; }
+        
 		// Distance vars
 		var distX = character.x-target.x;
 		var distY = character.y-target.y;
@@ -60,29 +85,6 @@ var CatchGame = function() {
 		
 		// Keep character in borders
 		this.keepInBoundaries(character);
-	};
-    
-	// Prevents from quitting the game area
-	this.keepInBoundaries = function (character) {
-		if (character.x < this.borders.left) { character.x = this.borders.left; }
-        else if (character.x > this.borders.right-character.width) {
-            character.x = this.borders.right-character.width;
-        }
-
-        if (character.y < this.borders.top) { character.y = this.borders.top; }
-        else if (character.y > this.borders.bottom-character.height) {
-            character.y = this.borders.bottom-character.height;
-        }
-	};
-	
-	// Detect characters collisions
-	this.detectCollision = function (char1, char2) {
-		return (
-			char1.x <= (char2.x + char2.width) &&
-			char2.x <= (char1.x + char1.width) &&
-			char1.y <= (char2.y + char2.height) &&
-			char2.y <= (char1.y + char1.height)
-		);
 	};
 	
 	// Update game objects
@@ -187,6 +189,7 @@ var GameRunner = function(ui, game, debug) {
 		var pos = this.ui.ch.getRealXY(this.tc.touch.x, this.tc.touch.y);
         if (!this.game.started && pos.x>196 && pos.x<316 && pos.y>250 && pos.y<300) {
             this.game.started = true;
+            DOMHelper.sleep(200);
         }
         
 		// Update characters positions
