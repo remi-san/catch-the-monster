@@ -1,281 +1,7 @@
-var UserInterface = function (div, width, height) {
+var CatchGame = function() {
 	
-    // Debug
-    this.debug = false;
-    
-	// Canvas
-	this.div = div;
-    this.width = width;
-    this.height = height;
-    this.canvasRatio = width/height;
-	this.canvas = null;
-	this.ctx = null;
-    
-    // Screen
-    this.screenWidth = 512;
-    this.screenHeight = 512;
-    this.screenRatio = 1;
-    
-    // Adaptation
-    this.ratio = 1;
-    this.marginLeft = 0;
-    this.marginTop = 0;
-	
-	// Keyboard controls
-	this.keysDown = {};
-	this.touch = { x: null, y: null };
-	this.clicked = false;
-	
-    // FPS
-	this.delta = 0.2;
-	this.fps = 0;
-	
-	this.init = function() {
-		var self = this;
-		
-		this.canvas = document.createElement("canvas");
-		this.ctx = this.canvas.getContext("2d");
-		this.div.appendChild(this.canvas);
-        
-		//Keys listeners
-		window.addEventListener("keydown", function (e) {
-			self.keysDown[e.keyCode] = true;
-		}, false);
-
-		window.addEventListener("keyup", function (e) {
-			delete self.keysDown[e.keyCode];
-		}, false);
-		
-		this.canvas.addEventListener("contextmenu", function (e) {
-			e = e || window.event;
-			if (e.stopPropagation) { e.stopPropagation(); }
-			e.cancelBubble = true;
-			e.preventDefault();
-		});
-		
-        window.addEventListener("load", function() { setTimeout(function(){ window.scrollTo(0, 1);}, 0); });
-        
-		this.canvas.addEventListener("touchstart", this.tap.bind(this));
-		this.canvas.addEventListener("mousedown", this.click.bind(this));
-		
-		this.canvas.addEventListener("touchmove", this.tap.bind(this));
-		this.canvas.addEventListener("mousemove", this.track.bind(this));
-		
-		this.canvas.addEventListener("touchend", this.release.bind(this));
-		this.canvas.addEventListener("mouseup", this.release.bind(this));
-		
-		this.canvas.addEventListener("touchleave", this.release.bind(this));
-		this.canvas.addEventListener("mouseout", this.release.bind(this));
-        
-        window.addEventListener("orientationchange", this.updateUI.bind(this));
-        window.addEventListener("resize", this.updateUI.bind(this));
-        
-        this.updateUI();
-	};
-	
-    this.updateUI = function () {
-        this.screenWidth = window.innerWidth;
-        this.screenHeight = window.innerHeight;
-        this.screenRatio = this.screenWidth/this.screenHeight;
-        
-        if (this.canvasRatio>this.screenRatio) {
-            this.ratio = this.screenWidth / this.width;
-            this.marginTop = (this.screenHeight-(this.height*this.ratio))/2;
-            this.marginLeft = 0;
-        } else {
-            this.ratio =  this.screenHeight / this.height;
-            this.marginTop = 0;
-            this.marginLeft = (this.screenWidth-(this.width*this.ratio))/2;
-        }
-        this.canvas.width = this.screenWidth;
-        this.canvas.height = this.screenHeight;
-    };
-    
-	this.click = function (e) {
-		e = e || window.event;
-		var button = e.which || e.button;
-		
-		if(button === 1) {
-			this.tap(e);
-		}
-	};
-	
-	this.tap = function (e) {
-		this.clicked = true;
-		this.track(e);
-		e.preventDefault();
-	};
-	
-	this.track = function (e) {
-		
-		e = e || window.event;
-		
-		if (this.clicked) {
-			var pos = this.getElementPosition(this.canvas),
-				tapX = e.targetTouches ? e.targetTouches[0].pageX : e.pageX,
-				tapY = e.targetTouches ? e.targetTouches[0].pageY : e.pageY;
-			
-			var currX = (tapX - pos.x);
-			var currY = (tapY - pos.y);
-
-			this.touch = this.getRealXY(currX, currY);
-		}
-	};
-	
-	this.release = function (e) {
-		e = e || window.event;
-		this.clicked = false;
-		this.touch = { x: null, y: null };
-	};
-	
-	this.getElementPosition = function (element) {
-	
-       var parentOffset,
-           pos = {
-               x: element.offsetLeft,
-               y: element.offsetTop 
-           };
-           
-       if (element.offsetParent) {
-           parentOffset = this.getElementPosition(element.offsetParent);
-           pos.x += parentOffset.x;
-           pos.y += parentOffset.y;
-       }
-       return pos;
-    };
-    
-    this.getRealValue = function (value) {
-        return value / this.ratio;
-    };
-    
-    this.getRealXY = function (x, y) {
-        return { x: this.getRealValue(x-this.marginLeft), y: this.getRealValue(y-this.marginTop) };
-    };
-    
-    this.getScreenValue = function (value) {
-        return value * this.ratio;
-    };
-    
-    this.getScreenXY = function (x, y) {
-        return { x: this.getScreenValue(x)+this.marginLeft, y: this.getScreenValue(y)+this.marginTop };
-    };
-    
-    this.drawImage = function (image, x, y, width, height) {
-        width = width || image.width;
-        height = height || image.height;
-        var pos = this.getScreenXY(x, y);
-        this.ctx.drawImage(image, 0, 0, width, height, pos.x, pos.y, this.getScreenValue(width), this.getScreenValue(height));
-    };
-    
-    this.drawRectangle = function (x, y, width, height, fillStyle, strokeStyle, lineWidth) {
-        // Colors
-        this.ctx.fillStyle = fillStyle || "rgb(255, 255, 255)";
-        this.ctx.strokeStyle = strokeStyle || "rgb(0, 0,0)";
-        this.ctx.lineWidth = lineWidth || 0;
-        
-        var pos = this.getScreenXY(x, y);
-
-        // Rectangle
-        this.ctx.beginPath();
-        this.ctx.rect(pos.x, pos.y, this.getScreenValue(width), this.getScreenValue(height)); 
-        this.ctx.fill();
-        this.ctx.stroke();
-    };
-    
-    this.drawText = function (text, x, y, color, align, vAlign, size, font) {
-        
-        size = size || 16;
-        font = font || "Helvetica";
-        
-        this.ctx.fillStyle = color || "rgb(0, 0,0)";
-        this.ctx.textAlign = align || "left";
-        this.ctx.textBaseline = vAlign || "top";
-        this.ctx.font = Math.round(size*this.ratio)+"px "+font;
-        
-        var pos = this.getScreenXY(x, y);
-        
-        this.ctx.fillText(text, pos.x, pos.y);
-    };
-    
-	// Draw everything
-	this.render = function (graphics, delta) {
-		
-		var self = this;
-		
-		this.delta += delta;
-        if(this.delta >= 0.2) {
-            this.delta = 0.001;
-            this.fps = Math.round(1/delta);
-        }
-		
-		// Draw graphics
-		graphics.forEach( function(element) {
-			element.gr.render(self, element.x, element.y);
-		});
-		
-		// Display debug info
-        if (this.debug === true) {
-            this.drawText(this.fps+" FPS", this.width, 0, "white", "right");
-
-            if (this.touch.x !== null) {
-                this.drawText("Click :"+Math.round(this.touch.x)+"/"+Math.round(this.touch.y), this.width, this.height-20, "white", "right");
-            }
-        }
-	};
-	
-	// Init the UI
-	this.init();
-};
-
-var UIImage = function (src) {
-    this.image = new Image();
-    this.ready = false;
-    this.src = src;
-    
-    this.init = function (src) {
-        var self = this;
-        
-        this.image.onload = function () {
-            self.ready = true;
-        };
-        this.image.src = this.src;
-    };
-    
-    this.width = function() {
-        return this.image.width;
-    };
-    
-    this.height = function() {
-        return this.image.height;
-    };
-    
-    this.render = function(ui, x, y) {
-        if (this.ready === true) {
-            ui.drawImage(this.image, x, y);
-        }
-    };
-    
-    this.init(src);
-};
-
-var UIResource = function(render) {
-	this.render = render;
-};
-
-var UIText = function(text, color, size, font) {
-	this.text = text;
-	this.color = color;
-	this.size = size;
-	this.font = font;
-	
-	this.render = function(ui, x, y) {
-		ui.drawText(this.text, x, y, this.color, undefined, undefined, this.size, this.font);
-	};
-};
-
-var Game = function() {
-	
-	// Date init
+	// State
+	this.started = false;
 	this.then = Date.now();
 	
 	// Characters
@@ -284,11 +10,12 @@ var Game = function() {
 	
 	// Area
 	this.gameArea = { width: 512, height: 480 };
+	this.borders = { left : 32, top: 32, right: 480, bottom: 448};
 	
 	// Game vars
-	this.started = false;
 	this.monstersCaught = 0;
 
+	// Init method
 	this.init = function () {
 		this.reset();
 	};
@@ -306,49 +33,57 @@ var Game = function() {
 		this.started = false;
 	};
 	
+	// Character movement management
 	this.move = function(character, target, distanceMove) {
 		
-		var moving = false;
-        
+		// Distance vars
 		var distX = character.x-target.x;
 		var distY = character.y-target.y;
-		
-		var distance = Math.sqrt(distX*distX+distY*distY);
-		var ratio = distance / distanceMove;
+		var ratio = Math.sqrt(distX*distX+distY*distY) / distanceMove;
         
-        var newX = character.x;
-        var newY = character.y;
+		// New coords variables
+        var newX = target.x;
+        var newY = target.y;
 		
+		// Computing new position
 		if(ratio > 1) {
-			newX -= distX / ratio;
-			newY -= distY / ratio;
-		} else {
-            newX = target.x;
-			newY = target.y;
-        }
-		
-		if(Math.abs(character.x-newX) !== 0 || Math.abs(character.y-newY) !== 0) {
-			moving = true;
+			newX = character.x - (distX / ratio);
+			newY = character.y - (distY / ratio);
 		}
-			
-        //prevents from quitting the game area
-        if (newX < 32) { newX = 32; }
-        else if (newX > this.gameArea.width-32-character.width) {
-            newX = this.gameArea.width-32-character.width;
-        }
-
-        if (newY < 32) { newY = 32; }
-        else if (newY > this.gameArea.height-32-character.height) {
-            newY = this.gameArea.height-32-character.height;
-        }
-
+		
+		// Detect movement
+		character.moving = (Math.abs(character.x-newX) !== 0 || Math.abs(character.y-newY) !== 0);
+		
         // Update the character position
         character.x      = newX;
         character.y      = newY;
-        character.moving = moving;
+		
+		// Keep character in borders
+		this.keepInBoundaries(character);
 	};
     
-    
+	// Prevents from quitting the game area
+	this.keepInBoundaries = function (character) {
+		if (character.x < this.borders.left) { character.x = this.borders.left; }
+        else if (character.x > this.borders.right-character.width) {
+            character.x = this.borders.right-character.width;
+        }
+
+        if (character.y < this.borders.top) { character.y = this.borders.top; }
+        else if (character.y > this.borders.bottom-character.height) {
+            character.y = this.borders.bottom-character.height;
+        }
+	};
+	
+	// Detect characters collisions
+	this.detectCollision = function (char1, char2) {
+		return (
+			char1.x <= (char2.x + char2.width) &&
+			char2.x <= (char1.x + char1.width) &&
+			char1.y <= (char2.y + char2.height) &&
+			char2.y <= (char1.y + char1.height)
+		);
+	};
 	
 	// Update game objects
 	this.update = function () {
@@ -362,23 +97,26 @@ var Game = function() {
 		}
 	};
 	
-	this.detectCollision = function (char1, char2) {
-		return (
-			char1.x <= (char2.x + char2.width) &&
-			char2.x <= (char1.x + char1.width) &&
-			char1.y <= (char2.y + char2.height) &&
-			char2.y <= (char1.y + char1.height)
-		);
-	};
-	
 	// Init the game
 	this.init();
 };
 
-var MiddleWare = function(ui, game) {
-    // 
+var GameRunner = function(ui, game, debug) {
+    
+	// Debug
+	this.debug = debug || false;
+	
+	// Components
 	this.ui = ui;
     this.game = game;
+	
+	// Controllers
+	this.kc = new KeyboardController();
+	this.tc = new TouchController(this.ui.canvas);
+
+    // FPS
+	this.delta = 0.2;
+	this.fps = 0;
 	
 	// Date init
 	this.then = Date.now();
@@ -404,18 +142,26 @@ var MiddleWare = function(ui, game) {
        {character : this.game.hero, controls : this.playerOneControls}, 
        {character : this.game.monster, controls : this.playerTwoControls}
     ];
+	
+	
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////// METHODS ///////////////////////////////////////////////////////////////////////
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
     
+	// Compute character target
     this.getCharacterTarget = function (char, controls, distanceMove) {
         var target = { x: char.x, y: char.y};
 
-        if (controls.touch && this.ui.touch.x !== null) {
-            target.x = this.ui.touch.x-(char.width/2);
-            target.y = this.ui.touch.y-(char.height/2);
+        if (controls.touch && this.tc.touch.x !== null) {
+			var pos = this.ui.ch.getRealXY(this.tc.touch.x, this.tc.touch.y);
+            target.x = pos.x-(char.width/2);
+            target.y = pos.y-(char.height/2);
         } else {
-            if (controls.up    in this.ui.keysDown) { target.y -= distanceMove; } // Player holding up
-            if (controls.down  in this.ui.keysDown) { target.y += distanceMove; } // Player holding down
-            if (controls.left  in this.ui.keysDown) { target.x -= distanceMove; } // Player holding left
-            if (controls.right in this.ui.keysDown) { target.x += distanceMove; } // Player holding right
+            if (controls.up    in this.kc.keysDown) { target.y -= distanceMove; } // Player holding up
+            if (controls.down  in this.kc.keysDown) { target.y += distanceMove; } // Player holding down
+            if (controls.left  in this.kc.keysDown) { target.x -= distanceMove; } // Player holding left
+            if (controls.right in this.kc.keysDown) { target.x += distanceMove; } // Player holding right
         }
         
         return target;
@@ -423,13 +169,23 @@ var MiddleWare = function(ui, game) {
     
     // The main game loop
 	this.run = function () {
+		
+		var self = this;
+		
 		var now = Date.now();
 		var deltaMs = now - this.then;
 		var delta = deltaMs / 1000;
-        
-        var self = this;
+		
+		// FPS computing
+		this.delta += delta;
+        if(this.delta >= 0.2) {
+            this.delta = 0.001;
+            this.fps = Math.round(1/delta);
+        }
 
-        if (!this.game.started && this.ui.touch.x>196 && this.ui.touch.x<316 && this.ui.touch.y>250 && this.ui.touch.y<300) {
+		// TODO move menu button detection
+		var pos = this.ui.ch.getRealXY(this.tc.touch.x, this.tc.touch.y);
+        if (!this.game.started && pos.x>196 && pos.x<316 && pos.y>250 && pos.y<300) {
             this.game.started = true;
         }
         
@@ -445,7 +201,7 @@ var MiddleWare = function(ui, game) {
         
 		this.game.update();
 		
-		// TODO build graphics array
+		// Build graphics array
 		var graphics = [ { gr: this.bgImage, x: 0, y: 0 } ];
 		if (!this.game.started) {
 			graphics.push({ gr: this.menu, x: 56, y: 140 });
@@ -457,22 +213,22 @@ var MiddleWare = function(ui, game) {
 			graphics.push({ gr: this.score, x: 5, y: 5 });
 		}
 		
-		this.ui.render(graphics, delta);
+		// Display debug info
+        if (this.debug === true) {
+			graphics.push({ gr: new UIText(this.fps+" FPS", "white", 16, "Helvetica", "right"), x: this.ui.width, y: 5 });
 
+            if (this.tc.touch.x !== null) {
+				pos = this.ui.ch.getRealXY(this.tc.touch.x, this.tc.touch.y);
+				graphics.push({ gr: new UIText("Click :"+Math.round(pos.x)+"/"+Math.round(pos.y), "white", 16, "Helvetica", "right"), x: this.ui.width, y: this.ui.height-20 });
+            }
+        }
+		
+		this.ui.render(graphics);
 		this.then = now;
 
 		// Request to do this again ASAP
-		requestAnimationFrame(this.run.bind(this));
+		window.requestAnimationFrame(this.run.bind(this));
 		
 		return delta;
 	};
 };
-
-// TODO change that
-// Cross-browser support for requestAnimationFrame
-var w = window;
-var requestAnimationFrame = w.requestAnimationFrame || w.webkitRequestAnimationFrame || w.msRequestAnimationFrame || w.mozRequestAnimationFrame;
-
-// Run the game
-var mw = new MiddleWare(new UserInterface(document.getElementById("game"), 512, 480), new Game());
-mw.run();

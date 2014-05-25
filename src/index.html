@@ -6,14 +6,18 @@
         <meta http-equiv="content-type" content="text/html">
         <meta name="viewport" content="width=device-width,user-scalable=0,initial-scale=1.0,minimum-scale=1.0,maximum-scale=1.0">
         <style type="text/css">
-        * { -webkit-user-select:none; -webkit-tap-highlight-color:rgba(255, 255, 255, 0); -ms-touch-action:none;} 
-        body  {margin:0;padding:0;overflow:hidden;background-color:black;font-family:arial;}
+            * { -webkit-user-select:none; -webkit-tap-highlight-color:rgba(255, 255, 255, 0); -ms-touch-action:none;} 
+            body  {margin:0;padding:0;overflow:hidden;background-color:black;font-family:arial;}
         </style>
-
-        <!-- The line below is required for access to the intel.xdk JS library -->
-        <script src="intelxdk.js"></script>
-
-        <!-- Prevents from dragging -->
+        
+        <script src="js/requestAnimationFrame.js" type="text/javascript" language="javascript"></script>
+        <script src="js/DOMHelper.js" type="text/javascript" language="javascript"></script>
+        <script src="js/KeyboardController.js" type="text/javascript" language="javascript"></script>
+        <script src="js/TouchController.js" type="text/javascript" language="javascript"></script>
+        <script src="js/CanvasHelper.js" type="text/javascript" language="javascript"></script>
+        <script src="js/UserInterface.js" type="text/javascript" language="javascript"></script>
+        <script src="js/game.js" type="text/javascript" language="javascript"></script>
+        
         <script type="text/javascript" language="javascript">
             //This code prevents users from dragging the page 
             var preventDefaultScroll = function(event) {
@@ -22,10 +26,15 @@
                 return false;
             };
             document.addEventListener('touchmove', preventDefaultScroll, false);
+            
+            // Run the game
+            window.addEventListener('load', function() {
+                var gr = new GameRunner(new UserInterface(document.getElementById("game"), 512, 480), new CatchGame(), true);
+                gr.run();
+            });
         </script>
 	</head>
 	<body>
 		<div id="game"></div>
-		<script src="js/game.js"></script>
 	</body>
 </html>
