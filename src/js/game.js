@@ -110,124 +110,150 @@ var GameRunner = function(ui, game, debug) {
 	
 	// Components
 	this.ui = ui;
+    this.ii = new InteractionInterface(this.ui);
     this.game = game;
 	
-	// Controllers
-	this.kc = new KeyboardController();
-	this.tc = new TouchController(this.ui.canvas);
-
     // FPS
+    this.then = Date.now();
 	this.delta = 0.2;
 	this.fps = 0;
-	
-	// Date init
-	this.then = Date.now();
-
-	// Graphics
-	this.bgImage = new UIImage("images/background.png", this.ui.width, this.ui.height);
-	this.heroImage = new UIImage("images/hero.png", this.game.hero.width, this.game.hero.height);
-	this.monsterImage = new UIImage("images/monster.png", this.game.monster.width, this.game.monster.height);
     
-	this.menu = new UIResource(function (ui, x, y) {
-		ui.drawRectangle(x, y, 400, 200, "lightgrey", "black", "6"); // Menu
-		ui.drawText("Catch the Robot", 200+x, 40+y, "black", "center", "top", 32); // Menu Title
-		ui.drawRectangle(140+x, 110+y, 120, 50, "black"); // Start button
-		ui.drawText("Start", 200+x, 116+y, "white", "center", "top", 32); // Start button text
-	});
-	
-	// Character controls
-	this.playerOneControls   = { up: 38, down: 40, left: 37, right: 39, touch: false };
-	this.playerTwoControls = { up: 90, down: 83, left: 81, right: 68, touch: true };
-    
-    // Characters config
-    this.characters = [
-       {character : this.game.hero, controls : this.playerOneControls}, 
-       {character : this.game.monster, controls : this.playerTwoControls}
-    ];
-	
+    // Game objects config
+    this.background = new UIImage("images/background.png", this.ui.width, this.ui.height);
+    this.menus = {};
+    this.characters = [];
+    this.displayedMenu = null;
 	
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////// METHODS ///////////////////////////////////////////////////////////////////////
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	
     
-	// Compute character target
-    this.getCharacterTarget = function (char, controls, distanceMove) {
-        var target = { x: char.x, y: char.y};
-
-        if (controls.touch && this.tc.touch.x !== null) {
-			var pos = this.ui.ch.getRealXY(this.tc.touch.x, this.tc.touch.y);
-            target.x = pos.x-(char.width/2);
-            target.y = pos.y-(char.height/2);
-        } else {
-            if (controls.up    in this.kc.keysDown) { target.y -= distanceMove; } // Player holding up
-            if (controls.down  in this.kc.keysDown) { target.y += distanceMove; } // Player holding down
-            if (controls.left  in this.kc.keysDown) { target.x -= distanceMove; } // Player holding left
-            if (controls.right in this.kc.keysDown) { target.x += distanceMove; } // Player holding right
-        }
+    // Init function
+    this.init = function () {
         
-        return target;
+        var self = this;
+        
+        this.menus = {
+            startMenu : {
+                graphics : new UIResource(function (ch, x, y) {
+                        ch.drawRectangle(x, y, 400, 200, "lightgrey", "black", "6"); // Menu
+                        ch.drawText("Catch the Robot", 200+x, 40+y, "black", "center", "top", 32); // Menu Title
+                        ch.drawRectangle(140+x, 110+y, 120, 50, "black"); // Start button
+                        ch.drawText("Start", 200+x, 116+y, "white", "center", "top", 32); // Start button text
+                    }),
+                buttons : [
+                    {
+                        name : 'Start',
+                        boundaries : { xmin: 196, ymin: 250, xmax: 316, ymax: 300 },
+                        action : function () {
+                            self.game.started = true;
+                        }
+                    }
+                ]
+            }
+        };
+        
+        this.characters = [
+           {
+               character : this.game.hero,
+               controls : { up: 38, down: 40, left: 37, right: 39, touch: false },
+               graphics: new UIImage("images/hero.png", this.game.hero.width, this.game.hero.height)
+           }, 
+           {
+               character : this.game.monster,
+               controls : { up: 90, down: 83, left: 81, right: 68, touch: true },
+               graphics: new UIImage("images/monster.png", this.game.monster.width, this.game.monster.height)
+           }
+        ];
+        
+        this.displayedMenu = this.menus.startMenu;
+    };
+    
+    // Compute FPS
+    this.updateFps = function (delta) {
+        this.delta += delta;
+        if(this.delta >= 0.2) {
+            this.delta = 0.001;
+            this.fps = Math.round(1/delta);
+        }
+    };
+    
+    // Update characters positions
+    this.updateCharactersPositions = function (delta) {
+        var self = this;
+        
+        this.characters.forEach(function(characterOptions) {
+            var char = characterOptions.character;
+            var controls = characterOptions.controls;
+            var distanceMove = char.speed * delta;
+            
+            game.move(char, self.ii.getCharacterTarget(char, controls, distanceMove), distanceMove);
+        });
     };
     
     // The main game loop
 	this.run = function () {
 		
-		var self = this;
-		
+        var self = this;
+        
+        // Delay management
 		var now = Date.now();
 		var deltaMs = now - this.then;
 		var delta = deltaMs / 1000;
 		
 		// FPS computing
-		this.delta += delta;
-        if(this.delta >= 0.2) {
-            this.delta = 0.001;
-            this.fps = Math.round(1/delta);
-        }
+		this.updateFps(delta);
 
-		// TODO move menu button detection
-		var pos = this.ui.ch.getRealXY(this.tc.touch.x, this.tc.touch.y);
-        if (!this.game.started && pos.x>196 && pos.x<316 && pos.y>250 && pos.y<300) {
-            this.game.started = true;
-            DOMHelper.sleep(200);
-        }
+        // Graphics
+		var graphics = [];
+        graphics.push({ gr: this.background, x: 0, y: 0 }); // Draw the background
         
-		// Update characters positions
-        this.characters.forEach(function(characterOptions) {
-            var char = characterOptions.character;
-            var controls = characterOptions.controls;
-            var distanceMove = char.speed * delta;
-            game.move(char, self.getCharacterTarget(char, controls, distanceMove), distanceMove);
-        });
-        
-		this.game.update();
-		
-		// Build graphics array
-		var graphics = [ { gr: this.bgImage, x: 0, y: 0 } ];
-		if (!this.game.started) {
-			graphics.push({ gr: this.menu, x: 56, y: 140 });
-		} else {
-			graphics.push({ gr: this.heroImage, x: this.game.hero.x, y: this.game.hero.y });
-			graphics.push({ gr: this.monsterImage, x: this.game.monster.x, y: this.game.monster.y });
+        if (this.game.started) { // Game running
+            
+            // Game update
+            this.updateCharactersPositions(delta);
+            this.game.update();
+            
+            // Graphics
+            graphics.push({ gr: this.characters[0].graphics, x: this.game.hero.x, y: this.game.hero.y });
+			graphics.push({ gr: this.characters[1].graphics, x: this.game.monster.x, y: this.game.monster.y });
 			graphics.push({ gr: new UIText("Score : "+this.game.monstersCaught, "white"), x: 5, y: 5 });
-		}
+            
+        } else { // Game halted
+            
+            // Graphics
+            graphics.push({ gr: this.displayedMenu.graphics, x: 56, y: 140 });
+            
+            // Button detection
+            this.displayedMenu.buttons.some( function (button) {
+                if (self.ii.inBoundaries(button.boundaries)) {
+                    button.action();
+                    DOMHelper.sleep(100);
+                    return true;
+                }
+            });
+            
+        }
 		
 		// Display debug info
         if (this.debug === true) {
 			graphics.push({ gr: new UIText(this.fps+" FPS", "white", 16, "Helvetica", "right"), x: this.ui.width, y: 5 });
 
-            if (this.tc.touch.x !== null) {
-				pos = this.ui.ch.getRealXY(this.tc.touch.x, this.tc.touch.y);
+            if (this.ii.tc.touch.x !== null) {
+				pos = this.ui.ch.getRealXY(this.ii.tc.touch.x, this.ii.tc.touch.y);
 				graphics.push({ gr: new UIText("Click :"+Math.round(pos.x)+"/"+Math.round(pos.y), "white", 16, "Helvetica", "right"), x: this.ui.width, y: this.ui.height-20 });
             }
         }
 		
+        // Rendering
 		this.ui.render(graphics);
 		this.then = now;
 
-		// Request to do this again ASAP
+		// Request to do this again
 		window.requestAnimationFrame(this.run.bind(this));
 		
-		return delta;
+		return deltaMs; // return delta in ms
 	};
+    
+    this.init();
 };
